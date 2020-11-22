@@ -13,8 +13,8 @@ import services.erreurs.CompteNotFoundException;
 import java.util.Date;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
 
 public class BanqueServiceImplTest {
 
@@ -43,19 +43,9 @@ public class BanqueServiceImplTest {
         // test du getClient
         Client cret = service.getClient(308L);
 
-        assertTrue(c.equals(cret));
+        assertThat(cret).isEqualTo(c);
         verify(clientDao);
     }
-
-
-
-
-
-
-
-
-
-
 
     @Test(expected = ClientNotFoundException.class)
     public void findClientNotFound() throws ClientNotFoundException {
@@ -68,27 +58,40 @@ public class BanqueServiceImplTest {
     }
 
     @Test
-    public void virement() {
+    public void virementOK() {
         // configuration des Mocks de Dao
         Compte c1 = new Compte(105L,null,500.00,new Date());
         Compte c2 = new Compte(334L,null,2500.00,new Date());
-
+        // enregistrement du comportement des mocks
         expect(compteDao.find(105L)).andStubReturn(Optional.of(c1));
         expect(compteDao.find(334L)).andStubReturn(Optional.of(c2));
         compteDao.edit(c1);
         compteDao.edit(c2);
-
+        // passage en mode replay
         replay(compteDao);
 
         // test du virement
-        try {
-            service.virement(105L, 334L, 250.00);
-        } catch (CompteNotFoundException e) {
-            fail();
-        }
+        assertThatCode( () -> service.virement(105L, 334L, 250.00) ).doesNotThrowAnyException();
 
-        assertEquals(250.00,  c1.getSolde(), 0.0);
-        assertEquals(2750.00, c2.getSolde(), 0.0);
+        assertThat(c1.getSolde()).isEqualTo(250.0);
+        assertThat(c2.getSolde()).isEqualTo(2750.0);
+
+        verify(compteDao);
+    }
+
+    @Test
+    public void virementCompteSourceInexistant() {
+        // enregistrement du comportement des mocks
+        Compte c2 = new Compte(334L,null,2500.00,new Date());
+        expect(compteDao.find(105L)).andStubReturn(Optional.empty());
+        expect(compteDao.find(334L)).andStubReturn(Optional.of(c2));
+        // passage en mode replay
+        replay(compteDao);
+
+        // test du virement
+        assertThatThrownBy( () -> service.virement(105L, 334L, 250.00) )
+            .isInstanceOf(CompteNotFoundException.class)
+            .hasMessageContaining("105");
 
         verify(compteDao);
     }
